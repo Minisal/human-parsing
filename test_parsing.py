@@ -85,9 +85,9 @@ def get_palette(num_cls):
 
 
 def human_parsing(config, text_image):
-    print(text_image)
     pars_mode = config.pars_mode
-    print(os.getcwd())
+    # print(text_image)
+    # print(os.getcwd())
     base_path = 'human-parsing'
     input_path = os.path.join(base_path, 'inputs')
     output_path = os.path.join(base_path, 'outputs')
