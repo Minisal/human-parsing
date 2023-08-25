@@ -1,1 +1,0 @@
-python3 simple_extractor.py --dataset 'pascal' --model-restore 'checkpoints/pascal.pth' --input-dir 'inputs' --output-dir 'outputs'

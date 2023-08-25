@@ -47,15 +47,15 @@ dataset_settings = {
     }
 }
 
-retarget_parsing = {
+remap_settings = {
     'pascal': {
-        'Background': 'background', 
-        'Head': 'body', 
-        'Torso': 'body', 
-        'Upper Arms': 'legs', 
-        'Lower Arms': 'legs',
-        'Upper Legs': 'legs',
-        'Lower Legs': 'legs',
+        0: 0, # 'Background': 'background', 
+        1: 1, # 'Head': 'body', 
+        2: 1, # 'Torso': 'body', 
+        3: 2, # 'Upper Arms': 'legs', 
+        4: 2, # 'Lower Arms': 'legs',
+        5: 1, # 'Upper Legs': 'legs',
+        6: 1, # 'Lower Legs': 'legs',
     }
 }
 
@@ -83,7 +83,12 @@ def get_palette(num_cls):
             lab >>= 3
     return palette
 
-
+def remap_parsing(parsing, pars_mode):
+    remap = remap_settings[pars_mode]
+    for k, v in remap.items():
+        parsing[parsing == k] = v
+    return parsing
+    
 def human_parsing(config, text_image):
     pars_mode = config.pars_mode
     # print(text_image)
@@ -140,12 +145,17 @@ def human_parsing(config, text_image):
             logits_result = transform_logits(upsample_output.data.cpu().numpy(), c, s, w, h, input_size=input_size)
             parsing_result = np.argmax(logits_result, axis=2)
             parsing_result_path = os.path.join(output_path, img_name[:-4] + '.png')
-            output_img = Image.fromarray(np.asarray(parsing_result, dtype=np.uint8))
+            parsing_result = np.asarray(parsing_result, dtype=np.uint8)
+            
+            if config.remap_parsing:
+                parsing_result = remap_parsing(parsing_result, pars_mode)
+            
+            output_img = Image.fromarray(parsing_result)
             output_img.putpalette(palette)
             output_img.save(parsing_result_path)
 
     pars_img = cv2.imread(output_path+'/test.png')
-    return pars_img
+    return pars_img, parsing_result
 
 
 if __name__ == '__main__':
