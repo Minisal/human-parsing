@@ -12,6 +12,7 @@
 """
 
 import os
+import cv2
 import torch
 import argparse
 import numpy as np
@@ -46,22 +47,17 @@ dataset_settings = {
     }
 }
 
-
-def get_arguments():
-    """Parse all the arguments provided from the CLI.
-    Returns:
-      A list of parsed arguments.
-    """
-    parser = argparse.ArgumentParser(description="Self Correction for Human Parsing")
-
-    parser.add_argument("--dataset", type=str, default='lip', choices=['lip', 'atr', 'pascal'])
-    parser.add_argument("--model-restore", type=str, default='', help="restore pretrained model parameters.")
-    parser.add_argument("--gpu", type=str, default='0', help="choose gpu device.")
-    parser.add_argument("--input-dir", type=str, default='', help="path of input image folder.")
-    parser.add_argument("--output-dir", type=str, default='', help="path of output image folder.")
-    parser.add_argument("--logits", action='store_true', default=False, help="whether to save the logits.")
-
-    return parser.parse_args()
+retarget_parsing = {
+    'pascal': {
+        'Background': 'background', 
+        'Head': 'body', 
+        'Torso': 'body', 
+        'Upper Arms': 'legs', 
+        'Lower Arms': 'legs',
+        'Upper Legs': 'legs',
+        'Lower Legs': 'legs',
+    }
+}
 
 
 def get_palette(num_cls):
@@ -88,22 +84,22 @@ def get_palette(num_cls):
     return palette
 
 
-def main():
-    args = get_arguments()
-
-    gpus = [int(i) for i in args.gpu.split(',')]
-    assert len(gpus) == 1
-    if not args.gpu == 'None':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-
-    num_classes = dataset_settings[args.dataset]['num_classes']
-    input_size = dataset_settings[args.dataset]['input_size']
-    label = dataset_settings[args.dataset]['label']
-    print("Evaluating total class number {} with {}".format(num_classes, label))
+def human_parsing(config, text_image):
+    print(text_image)
+    pars_mode = config.pars_mode
+    print(os.getcwd())
+    base_path = 'human-parsing'
+    input_path = os.path.join(base_path, 'inputs')
+    output_path = os.path.join(base_path, 'outputs')
+    ckpt_path = os.path.join(base_path, 'checkpoints', config.pars_mode+'.pth')
+    num_classes = dataset_settings[pars_mode]['num_classes']
+    input_size = dataset_settings[pars_mode]['input_size']
+    label = dataset_settings[pars_mode]['label']
+    # print("Evaluating total class number {} with {}".format(num_classes, label))
 
     model = networks.init_model('resnet101', num_classes=num_classes, pretrained=None)
 
-    state_dict = torch.load(args.model_restore)['state_dict']
+    state_dict = torch.load(ckpt_path)['state_dict']
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
@@ -117,11 +113,13 @@ def main():
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.406, 0.456, 0.485], std=[0.225, 0.224, 0.229])
     ])
-    dataset = SimpleFolderDataset(root=args.input_dir, input_size=input_size, transform=transform)
+    
+    cv2.imwrite(input_path+'/test.png', text_image)
+    dataset = SimpleFolderDataset(root=input_path, input_size=input_size, transform=transform)
     dataloader = DataLoader(dataset)
 
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
 
     palette = get_palette(num_classes)
     with torch.no_grad():
@@ -141,14 +139,13 @@ def main():
 
             logits_result = transform_logits(upsample_output.data.cpu().numpy(), c, s, w, h, input_size=input_size)
             parsing_result = np.argmax(logits_result, axis=2)
-            parsing_result_path = os.path.join(args.output_dir, img_name[:-4] + '.png')
+            parsing_result_path = os.path.join(output_path, img_name[:-4] + '.png')
             output_img = Image.fromarray(np.asarray(parsing_result, dtype=np.uint8))
             output_img.putpalette(palette)
             output_img.save(parsing_result_path)
-            if args.logits:
-                logits_result_path = os.path.join(args.output_dir, img_name[:-4] + '.npy')
-                np.save(logits_result_path, logits_result)
-    return
+
+    pars_img = cv2.imread(output_path+'/test.png')
+    return pars_img
 
 
 if __name__ == '__main__':
