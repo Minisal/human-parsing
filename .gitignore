@@ -1,0 +1,6 @@
+checkpoints/*
+demo/
+inputs/*
+outputs/*
+temp_results/*
+human_parsing.egg-info
